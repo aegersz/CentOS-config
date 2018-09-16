@@ -1,0 +1,168 @@
+*filter
+:INPUT DROP [4:599]
+:FORWARD ACCEPT [0:0]
+:OUTPUT ACCEPT [236:271966]
+:ATTACKED - [0:0]
+:ATTK_CHECK - [0:0]
+:SSHATTACK - [0:0]
+:SSHA_CHECK - [0:0]
+:f2b-SSH - [0:0]
+:f2b-apache-overflows - [0:0]
+:f2b-dovecot - [0:0]
+:f2b-dovecot-pop3imap - [0:0]
+:f2b-postfix - [0:0]
+:f2b-webmin - [0:0]
+:rst-flood - [0:0]
+:syn-flood - [0:0]
+-A INPUT -p tcp -m tcp ! --tcp-flags FIN,SYN,RST,ACK SYN -m state --state NEW -j DROP 
+-A INPUT -f -j DROP 
+-A INPUT -p tcp -m tcp --tcp-flags FIN,SYN,RST,PSH,ACK,URG FIN,PSH,URG -j DROP 
+-A INPUT -p tcp -m tcp --tcp-flags FIN,SYN,RST,PSH,ACK,URG FIN,SYN,RST,PSH,ACK,URG -j DROP 
+-A INPUT -p tcp -m tcp --tcp-flags FIN,SYN,RST,PSH,ACK,URG NONE -m limit --limit 5/min --limit-burst 7 -j LOG --log-prefix " NULL Packets " --log-level 7 
+-A INPUT -p tcp -m tcp --tcp-flags FIN,SYN,RST,PSH,ACK,URG NONE -j DROP 
+-A INPUT -p tcp -m tcp --tcp-flags SYN,RST SYN,RST -j DROP 
+-A INPUT -p tcp -m tcp --tcp-flags FIN,SYN FIN,SYN -m limit --limit 5/min --limit-burst 7 -j LOG --log-prefix " XMAS Packets " --log-level 7 
+-A INPUT -p tcp -m tcp --tcp-flags FIN,SYN FIN,SYN -j DROP 
+-A INPUT -p tcp -m tcp --tcp-flags FIN,ACK FIN -m limit --limit 5/min --limit-burst 7 -j LOG --log-prefix " Fin Packets Scan " --log-level 7 
+-A INPUT -p tcp -m tcp --tcp-flags FIN,ACK FIN -j DROP 
+-A INPUT -p tcp -m tcp --tcp-flags FIN,SYN,RST,PSH,ACK,URG FIN,SYN,RST,ACK,URG -j DROP 
+-A INPUT -m pkttype --pkt-type broadcast -j LOG --log-prefix " Broadcast " --log-level 7 
+-A INPUT -m pkttype --pkt-type broadcast -j DROP 
+-A INPUT -m pkttype --pkt-type multicast -j LOG --log-prefix " Multicast " --log-level 7 
+-A INPUT -m pkttype --pkt-type multicast -j DROP 
+-A INPUT -m state --state INVALID -j DROP 
+-A INPUT -i lo -j ACCEPT 
+#
+# whitelist
+-A INPUT -s XX.XX.0.0/16 -j ACCEPT 
+#
+# blacklist
+-A INPUT -s 5.178.86.77/32 -j DROP
+-A INPUT -s 23.254.217.28/32 -j DROP 
+-A INPUT -s 155.133.82.149/32 -j DROP 
+-A INPUT -s 37.49.226.107/32 -j DROP 
+-A INPUT -s 101.201.106.141/32 -j DROP 
+-A INPUT -p tcp -m tcp --dport 22 -m recent --update --seconds 3600 --name SSHBAN --rsource -j DROP 
+-A INPUT -p tcp -m tcp --dport 22 -m state --state NEW -j SSHA_CHECK 
+-A INPUT -p tcp -m tcp --dport 22 -j f2b-SSH 
+-A INPUT -p tcp -m multiport --dports 80,443,25,2525,587,110,995,143,993,4190 -j f2b-postfix 
+-A INPUT -p tcp -m multiport --dports 110,995,143,993 -j f2b-dovecot-pop3imap 
+-A INPUT -p tcp -m multiport --dports 110,995,143,993,587,465,4190 -j f2b-dovecot 
+-A INPUT -p tcp -m multiport --dports 10000 -j f2b-webmin 
+-A INPUT -p tcp -m multiport --dports 80,443 -j f2b-apache-overflows 
+-A INPUT -p icmp -m icmp --icmp-type 8 -j ACCEPT 
+-A INPUT -p tcp -m tcp --tcp-flags FIN,SYN,RST,ACK SYN -j syn-flood 
+-A INPUT -p tcp -m tcp --tcp-flags RST RST -j rst-flood 
+-A INPUT -p tcp -m multiport --dports 21,110,143,993,995 -m recent --update --seconds 3600 --name BANNED --rsource -j DROP 
+-A INPUT -p tcp -m multiport --dports 21,110,143,993,995 -m state --state NEW -j ATTK_CHECK 
+-A INPUT -p tcp -m tcp --dport 20 -j ACCEPT 
+-A INPUT -p tcp -m tcp --dport 22 -j ACCEPT 
+-A INPUT -p tcp -m tcp --dport 80 -j ACCEPT 
+-A INPUT -p tcp -m tcp --dport 443 -j ACCEPT 
+-A INPUT -p tcp -m tcp --dport 2525 -j ACCEPT 
+-A INPUT -p tcp -m tcp --dport 25 -j ACCEPT 
+-A INPUT -p tcp -m tcp --dport 465 -j ACCEPT 
+-A INPUT -p tcp -m tcp --dport 587 -j ACCEPT 
+-A INPUT -p tcp -m tcp --dport 783 -j ACCEPT 
+-A INPUT -p tcp -m tcp --dport 873 -j ACCEPT 
+-A INPUT -p tcp -m tcp --dport 10000 -j ACCEPT 
+-A INPUT -m recent --rcheck --seconds 86400 --name portscan --rsource -j DROP 
+-A INPUT -m recent --remove --name portscan --rsource 
+-A INPUT -p tcp -m tcp --dport 139 -m recent --set --name portscan --rsource -j LOG --log-prefix "portscan:" --log-level 7 
+-A INPUT -p tcp -m tcp --dport 139 -m recent --set --name portscan --rsource -j DROP 
+-A INPUT -m state --state RELATED,ESTABLISHED -j ACCEPT 
+-A FORWARD -m recent --rcheck --seconds 86400 --name portscan --rsource -j DROP 
+-A FORWARD -m recent --remove --name portscan --rsource 
+-A OUTPUT -p icmp -m icmp --icmp-type 0 -j ACCEPT 
+-A ATTACKED -m limit --limit 5/min -j LOG --log-prefix "IPTABLES (Rule ATTACKED): " --log-level 7 
+-A ATTACKED -m recent --set --name BANNED --rsource -j DROP 
+-A ATTK_CHECK -m recent --set --name ATTK --rsource 
+-A ATTK_CHECK -m recent --update --seconds 3600 --hitcount 16 --name ATTK --rsource -j ATTACKED 
+-A ATTK_CHECK -m recent --update --seconds 360 --hitcount 6 --name ATTK --rsource -j ATTACKED 
+-A ATTK_CHECK -j RETURN 
+-A SSHATTACK -j LOG --log-prefix "Anti SSH-Bruteforce: " --log-level 7 
+-A SSHATTACK -m recent --set --name SSHBAN --rsource -j DROP 
+-A SSHA_CHECK -m recent --set --name SSHA --rsource 
+-A SSHA_CHECK -m recent --update --seconds 86400 --hitcount 6 --name SSHA --rsource -j SSHATTACK 
+-A SSHA_CHECK -j RETURN 
+#
+# modifed by fail2ban:
+-A f2b-SSH -s 62.45.71.234/32 -j REJECT --reject-with icmp-port-unreachable 
+-A f2b-SSH -s 85.149.127.199/32 -j REJECT --reject-with icmp-port-unreachable 
+-A f2b-SSH -s 45.117.82.184/32 -j REJECT --reject-with icmp-port-unreachable 
+-A f2b-SSH -s 1.182.171.24/32 -j REJECT --reject-with icmp-port-unreachable 
+-A f2b-SSH -s 27.72.0.164/32 -j REJECT --reject-with icmp-port-unreachable 
+-A f2b-SSH -s 27.74.252.208/32 -j REJECT --reject-with icmp-port-unreachable 
+-A f2b-SSH -s 27.125.40.19/32 -j REJECT --reject-with icmp-port-unreachable 
+-A f2b-SSH -s 42.7.26.85/32 -j REJECT --reject-with icmp-port-unreachable 
+-A f2b-SSH -s 51.15.128.90/32 -j REJECT --reject-with icmp-port-unreachable 
+-A f2b-SSH -s 58.218.204.0/24 -j REJECT --reject-with icmp-port-unreachable 
+-A f2b-SSH -s 58.218.211.17/32 -j REJECT --reject-with icmp-port-unreachable 
+-A f2b-SSH -s 59.45.175.0/24 -j REJECT --reject-with icmp-port-unreachable 
+-A f2b-SSH -s 61.97.130.40/32 -j REJECT --reject-with icmp-port-unreachable 
+-A f2b-SSH -s 61.177.172.188/32 -j REJECT --reject-with icmp-port-unreachable 
+-A f2b-SSH -s 70.105.173.75/32 -j REJECT --reject-with icmp-port-unreachable 
+-A f2b-SSH -s 74.208.185.135/32 -j REJECT --reject-with icmp-port-unreachable 
+-A f2b-SSH -s 91.197.232.108/32 -j REJECT --reject-with icmp-port-unreachable 
+-A f2b-SSH -s 94.77.169.128/32 -j REJECT --reject-with icmp-port-unreachable 
+-A f2b-SSH -s 94.177.199.168/32 -j REJECT --reject-with icmp-port-unreachable 
+-A f2b-SSH -s 94.228.241.69/32 -j REJECT --reject-with icmp-port-unreachable 
+-A f2b-SSH -s 94.242.255.0/24 -j REJECT --reject-with icmp-port-unreachable 
+-A f2b-SSH -s 103.99.2.4/32 -j REJECT --reject-with icmp-port-unreachable 
+-A f2b-SSH -s 103.207.37.143/32 -j REJECT --reject-with icmp-port-unreachable 
+-A f2b-SSH -s 103.242.64.26/32 -j REJECT --reject-with icmp-port-unreachable 
+-A f2b-SSH -s 104.37.212.67/32 -j REJECT --reject-with icmp-port-unreachable 
+-A f2b-SSH -s 115.238.245.8/32 -j REJECT --reject-with icmp-port-unreachable 
+-A f2b-SSH -s 116.31.116.0/24 -j REJECT --reject-with icmp-port-unreachable 
+-A f2b-SSH -s 117.245.10.35/32 -j REJECT --reject-with icmp-port-unreachable 
+-A f2b-SSH -s 117.253.182.2/32 -j REJECT --reject-with icmp-port-unreachable 
+-A f2b-SSH -s 117.253.213.47/32 -j REJECT --reject-with icmp-port-unreachable 
+-A f2b-SSH -s 117.255.253.156/32 -j REJECT --reject-with icmp-port-unreachable 
+-A f2b-SSH -s 119.249.54.0/24 -j REJECT --reject-with icmp-port-unreachable 
+-A f2b-SSH -s 122.194.229.7/32 -j REJECT --reject-with icmp-port-unreachable 
+-A f2b-SSH -s 122.226.181.0/24 -j REJECT --reject-with icmp-port-unreachable 
+-A f2b-SSH -s 139.199.223.39/32 -j REJECT --reject-with icmp-port-unreachable 
+-A f2b-SSH -s 151.80.47.122/32 -j REJECT --reject-with icmp-port-unreachable 
+-A f2b-SSH -s 153.99.182.16/32 -j REJECT --reject-with icmp-port-unreachable 
+-A f2b-SSH -s 154.16.241.125/32 -j REJECT --reject-with icmp-port-unreachable 
+-A f2b-SSH -s 175.6.27.205/32 -j REJECT --reject-with icmp-port-unreachable 
+-A f2b-SSH -s 181.211.74.186/32 -j REJECT --reject-with icmp-port-unreachable 
+-A f2b-SSH -s 195.154.50.188/32 -j REJECT --reject-with icmp-port-unreachable 
+-A f2b-SSH -s 200.91.92.155/32 -j REJECT --reject-with icmp-port-unreachable 
+-A f2b-SSH -s 212.83.162.210/32 -j REJECT --reject-with icmp-port-unreachable 
+-A f2b-SSH -s 213.141.43.115/32 -j REJECT --reject-with icmp-port-unreachable 
+-A f2b-SSH -s 218.65.30.217/32 -j REJECT --reject-with icmp-port-unreachable 
+-A f2b-SSH -s 218.156.85.17/32 -j REJECT --reject-with icmp-port-unreachable 
+-A f2b-SSH -s 221.194.44.0/24 -j REJECT --reject-with icmp-port-unreachable 
+-A f2b-SSH -s 221.194.47.0/24 -j REJECT --reject-with icmp-port-unreachable 
+-A f2b-SSH -s 221.229.172.97/32 -j REJECT --reject-with icmp-port-unreachable 
+-A f2b-SSH -s 222.124.188.66/32 -j REJECT --reject-with icmp-port-unreachable 
+-A f2b-SSH -s 222.239.10.143/32 -j REJECT --reject-with icmp-port-unreachable 
+-A f2b-SSH -j RETURN 
+-A f2b-apache-overflows -j RETURN 
+-A f2b-dovecot -j RETURN 
+-A f2b-dovecot-pop3imap -j RETURN 
+-A f2b-postfix -s 50.199.104.109/32 -j REJECT --reject-with icmp-port-unreachable 
+-A f2b-postfix -j RETURN 
+-A f2b-webmin -j RETURN 
+-A rst-flood -m limit --limit 10/sec --limit-burst 20 -j RETURN 
+-A rst-flood -j LOG --log-prefix "RST flood: " --log-level 7 
+-A rst-flood -j DROP 
+-A syn-flood -m limit --limit 10/sec --limit-burst 20 -j RETURN 
+-A syn-flood -j LOG --log-prefix "SYN flood: " --log-level 7 
+-A syn-flood -j DROP 
+COMMIT
+#
+*mangle
+:PREROUTING ACCEPT [377411:48320867]
+:INPUT ACCEPT [377411:48320867]
+:FORWARD ACCEPT [0:0]
+:OUTPUT ACCEPT [420352:728236114]
+:POSTROUTING ACCEPT [420352:728236114]
+COMMIT
+#
+*nat
+:PREROUTING ACCEPT [23452:1356419]
+:POSTROUTING ACCEPT [865:62143]
+:OUTPUT ACCEPT [865:62143]
+COMMIT
