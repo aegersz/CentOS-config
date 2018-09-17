@@ -1,0 +1,10 @@
+# ADD TO: /etc/rc.d/rc.local
+
+# Enable SYNACK handling
+echo 1 > /proc/sys/net/ipv4/tcp_syncookies
+echo 2048 > /proc/sys/net/ipv4/tcp_max_syn_backlog
+echo 3 > /proc/sys/net/ipv4/tcp_synack_retries
+
+# Enable IP spoofing protection
+for i in /proc/sys/net/ipv4/conf/*/rp_filter; do echo 1 > $i; done
+
