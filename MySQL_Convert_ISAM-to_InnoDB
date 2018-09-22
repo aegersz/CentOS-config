@@ -1,0 +1,1 @@
+mysql -u dbuser -pdbpass smf209 -e "show table status where Engine='MyISAM';" | awk 'NR>1 { print "ALTER TABLE "$1" ENGINE = InnoDB;" }' | mysql -u dbuser -pdbpass smf209
